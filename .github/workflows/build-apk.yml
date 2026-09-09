@@ -1,0 +1,53 @@
+name: Build Flutter APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subobito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      - name: Generate Android Project
+        run: |
+          mkdir -p test
+          touch test/widget_test.dart
+          flutter create --project-name morocco_prayer_times --org com.morocco .
+
+      - name: Fix Android Build Configurations
+        run: |
+          sed -i -E 's/(id "org.jetbrains.kotlin.android" version ")[0-9.]+(" apply false)/\11.9.0\2/' android/settings.gradle
+          sed -i -E "s/(ext.kotlin_version = ')[0-9.]+(')/\11.9.0\2/" android/build.gradle
+          sed -i -E 's/minSdkVersion [0-9]+/minSdkVersion 21/' android/app/build.gradle
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: morocco-prayer-app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 90
